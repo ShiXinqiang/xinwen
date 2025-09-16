@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# IDE / Editor files
+.vscode/
+.idea/
+
+# Dotenv
+.env
+
+# Sent articles cache
+sent_articles.txt
+sent_titles.txt
+
+# Playwright cache
+.cache/
