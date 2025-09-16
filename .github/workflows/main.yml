@@ -1,0 +1,54 @@
+name: GNews Bot Runner
+
+on:
+  schedule:
+    # 每小时运行一次 (在每小时的第5分钟)。您可以根据需要修改
+    - cron: '5 * * * *'
+  workflow_dispatch: # 允许手动触发
+
+# 赋予工作流写入文件的权限，用于保存 sent_articles.txt
+permissions:
+  contents: write
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest # 使用最新的Ubuntu服务器环境
+    steps:
+      # 步骤1：先把代码从仓库下载到服务器
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 步骤2：设置Python环境
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9' # 使用Python 3.9版本
+
+      # 步骤3：安装项目所需的所有Python库
+      # 它会自动读取您的 requirements.txt 文件并安装
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 步骤4：【关键步骤】安装 Playwright 所需的浏览器
+      - name: Install Playwright Browsers
+        run: playwright install --with-deps
+
+      # 步骤5：运行您的主程序
+      - name: Run GNews Bot Script
+        # 将我们设置的Secrets作为环境变量传递给Python脚本
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+        run: python gnews_bot_cn.py # 确保您的Python文件名是这个
+
+      # 步骤6：将更新后的 sent_articles.txt 文件保存回仓库
+      - name: Commit and push sent_articles.txt
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sent_articles.txt
+          # 如果文件有变化则提交，没有变化则跳过
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent articles list" && git push)
