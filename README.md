@@ -101,6 +101,7 @@
 ```bash
 git clone https://github.com/itl33054/xinwen.git
 cd xinwen
+```
 
 #### 第2步：创建并激活虚拟环境
 
@@ -122,3 +123,43 @@ cd xinwen
 
 ```bash
 pip install -r requirements.txt
+```
+#### 第4步：安装 Playwright 的浏览器内核
+
+```bash
+playwright install --with-deps
+```
+### 第5步：创建并配置 .env 文件
+
+在项目根目录下，创建一个名为 .env 的文件。
+将以下内容复制到文件中，并替换为您自己的 Keys 和 IDs：
+```bash
+TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+TELEGRAM_CHAT_ID="-1001234567890"
+GNEWS_API_KEY="your_gnews_api_key_here"
+```
+### 第6步：运行脚本
+```bash
+python gnews_bot_cn.py
+```
+您将在终端看到日志输出，同时机器人会将新发现的新闻发送到您的 Telegram 频道。注意，本地脚本只会运行一次便会退出，这符合其为云端定时任务设计的初衷。
+### 📂 文件结构说明
+```bash
+.
+├── .github/workflows/main.yml  # GitHub Actions 配置文件，定义了自动化任务
+├── .gitignore                  # 定义了 Git 应忽略的文件
+├── gnews_bot_cn.py             # 机器人核心逻辑脚本
+├── requirements.txt            # Python 依赖库列表
+├── sent_articles.txt           # 已发送文章的 URL 记录 (自动生成和更新)
+├── sent_titles.txt             # 已发送文章的标题记录 (自动生成和更新)
+└── README.md                   # 本说明文件
+```
+## 🤝 如何贡献
+欢迎任何形式的贡献！如果您有好的想法或发现了 Bug，请随时提交 Pull Request 或创建 Issue。
+Fork 本仓库
+创建您的新分支 (git checkout -b feature/AmazingFeature)
+提交您的更改 (git commit -m 'Add some AmazingFeature')
+推送到分支 (git push origin feature/AmazingFeature)
+创建一个 Pull Request
+### 📄 许可证
+本项目使用 MIT 许可证。
