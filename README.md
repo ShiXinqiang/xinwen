@@ -157,9 +157,9 @@ python gnews_bot_cn.py
 ## 🤝 如何贡献
 欢迎任何形式的贡献！如果您有好的想法或发现了 Bug，请随时提交 Pull Request 或创建 Issue。
 Fork 本仓库
-创建您的新分支 (git checkout -b feature/AmazingFeature)
-提交您的更改 (git commit -m 'Add some AmazingFeature')
-推送到分支 (git push origin feature/AmazingFeature)
-创建一个 Pull Request
+**创建您的新分支 (git checkout -b feature/AmazingFeature)**
+**提交您的更改 (git commit -m 'Add some AmazingFeature')**
+**推送到分支 (git push origin feature/AmazingFeature)**
+**创建一个 Pull Request**
 ### 📄 许可证
 本项目使用 MIT 许可证。
