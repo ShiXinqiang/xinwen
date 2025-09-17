@@ -11,7 +11,7 @@
 机器人会将格式化后的新闻以卡片形式发送到您的 Telegram 频道，如下所示：
 
 *(请在此处替换为您自己机器人发送消息的截图)*
-<img src="" width="400">
+<img src="https://github.com/itl33054/tupin/blob/main/tupinc/photo_2025-09-17_16-35-43.jpg" width="400">
 
 
 ---
