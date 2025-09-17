@@ -101,3 +101,24 @@
 ```bash
 git clone https://github.com/itl33054/xinwen.git
 cd xinwen
+
+#### 第2步：创建并激活虚拟环境
+
+*   **Windows**:
+
+    ```powershell
+    python -m venv venv
+    .\venv\Scripts\activate
+    ```
+
+*   **macOS / Linux**:
+
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+#### 第3步：安装所有依赖库
+
+```bash
+pip install -r requirements.txt
