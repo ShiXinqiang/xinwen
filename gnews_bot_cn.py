@@ -116,7 +116,7 @@ async def send_single_article(bot, article, pub_time: str, summary: str):
         f"<b>{title}</b>\n",
         summary_text,
         "",
-        f"👉 详细信息：<a href='{url}'>点击阅读原文</a>",
+        f"详细信息：<a href='{url}'>点击阅读原文</a>",
         f"发布时间：{display_time}",
         f"信息来源：<a href='{url}'>{source_name}</a>",
         f"投稿联系：<a href='{CONTACT_LINK_URL}'>{CONTACT_LINK_TEXT}</a>",
@@ -215,3 +215,4 @@ async def main():
 if __name__ == '__main__':
     jieba.initialize()
     asyncio.run(main())
+
