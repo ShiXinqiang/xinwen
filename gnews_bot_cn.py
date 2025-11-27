@@ -27,9 +27,9 @@ MAX_ARTICLES_TO_SEND = 3
 SEND_INTERVAL_SECONDS = 20 # 在单次运行中发送多条消息的间隔
 SENT_ARTICLES_FILE = 'sent_articles.txt'
 SENT_TITLES_FILE = 'sent_titles.txt'
-CHANNEL_TOPIC_HEADER = "【全球新闻快讯】"
+CHANNEL_TOPIC_HEADER = "【东方西方新闻】"
 CONTACT_LINK_TEXT = "联系投稿"
-CONTACT_LINK_URL = "https://t.me/IE8GB"
+CONTACT_LINK_URL = "https://t.me/tl33054"
 GROUP_LINK_TEXT = "加入讨论群"
 GROUP_LINK_URL = "https://t.me/DONG8NY"
 
@@ -215,5 +215,6 @@ async def main():
 if __name__ == '__main__':
     jieba.initialize()
     asyncio.run(main())
+
 
 
