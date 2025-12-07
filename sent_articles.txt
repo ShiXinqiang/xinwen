@@ -2150,3 +2150,5 @@ http://news.weather.com.cn/2025/12/4423830.shtml
 https://news.cctv.cn/2025/12/07/ARTIed0j3yTpjYf5334NSUYH251207.shtml
 https://news.qq.com/rain/a/20251207A0327F00
 http://news.cnhubei.com/content/2025-12/07/content_19712725.html
+https://www.bbc.com/zhongwen/articles/cj69y794nj5o/simp
+https://news.cctv.cn/2025/12/07/ARTIutXGmYJoF8IjN0ja5zFd251207.shtml
