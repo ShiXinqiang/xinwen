@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from newsbot.config import db_path
 
 DEFAULT_CONFIG = {
-    'keywords': '["Бартер","БРИКС","Китай","Импорт","Санкции","Экономика","ВЭД","ЕАЭС","Логистика","Таможня","Пошлины","Транзит","Параллельный импорт"]',
+    'keywords': '["Бартер","БРИКС","Китай","Импорт","Санкции","Экономика","ВЭД","ЕАЭС","Логистика","Таможня","Пошлины","Транзит","Параллельный импорт","КНР"]',
     'excluded_keywords': '["нефть","газ","алюминий","сырьё","металл","добыча","уголь"]',
     'semantic_threshold': '0.55',
     'max_articles_to_send': '30',
@@ -109,6 +109,16 @@ def init_db():
 # Слова, которые раньше отсеивались исключением «газ» как подстрокой.
 # Фильтр по леммам их не ловит (и не ловит «газету»), поэтому добавляем явно — один раз.
 _EXCLUDED_ADDED_V2 = ["Газпром", "газовый", "газопровод"]
+# Ключевые слова, добавленные по запросу редакции.
+_KEYWORDS_ADDED_V3 = ["КНР"]
+
+
+def _append_missing(cursor, key: str, words: list):
+    row = cursor.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
+    current = json.loads(row[0])
+    present = {w.lower() for w in current}
+    current += [w for w in words if w.lower() not in present]
+    cursor.execute("REPLACE INTO config (key, value) VALUES (?, ?)", (key, json.dumps(current, ensure_ascii=False)))
 
 
 def _migrate_config(cursor):
@@ -116,13 +126,11 @@ def _migrate_config(cursor):
     version = int(row[0]) if row else 1
     if version < 2:
         row = cursor.execute("SELECT value FROM config WHERE key = 'excluded_keywords'").fetchone()
-        excluded = json.loads(row[0])
-        if any(w.lower() == 'газ' for w in excluded):
-            present = {w.lower() for w in excluded}
-            excluded += [w for w in _EXCLUDED_ADDED_V2 if w.lower() not in present]
-            cursor.execute("REPLACE INTO config (key, value) VALUES ('excluded_keywords', ?)",
-                           (json.dumps(excluded, ensure_ascii=False),))
-        cursor.execute("REPLACE INTO config (key, value) VALUES ('config_version', '2')")
+        if any(w.lower() == 'газ' for w in json.loads(row[0])):
+            _append_missing(cursor, 'excluded_keywords', _EXCLUDED_ADDED_V2)
+    if version < 3:
+        _append_missing(cursor, 'keywords', _KEYWORDS_ADDED_V3)
+        cursor.execute("REPLACE INTO config (key, value) VALUES ('config_version', '3')")
 
 
 # ============================================================
