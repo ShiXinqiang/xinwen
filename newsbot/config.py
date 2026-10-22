@@ -23,6 +23,8 @@ class Settings:
     gnews_api_key: str | None
     # Как часто собирать новости в постоянно работающем процессе (VPS)
     collect_interval_minutes: int = 30
+    # Модель для оценки новостей: короткое имя (yandexgpt-lite/latest) или полный URI
+    score_model: str = "yandexgpt-lite/latest"
 
 
 def load_settings() -> Settings:
@@ -35,6 +37,7 @@ def load_settings() -> Settings:
         yandex_api_key=os.getenv("YANDEX_API_KEY") or None,
         gnews_api_key=os.getenv("GNEWS_API_KEY") or None,
         collect_interval_minutes=int(os.getenv("COLLECT_INTERVAL_MINUTES") or 30),
+        score_model=os.getenv("SCORE_MODEL") or "yandexgpt-lite/latest",
     )
 
 

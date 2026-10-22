@@ -15,7 +15,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("NEWS_DB_PATH", str(tmp_path / "news.db"))
     for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ADMIN_CHAT_ID", "ALLOWED_USER_IDS",
                  "YANDEX_FOLDER_ID", "YANDEX_API_KEY", "GNEWS_API_KEY",
-                 "COLLECT_INTERVAL_MINUTES", "BACKUP_DIR"):
+                 "COLLECT_INTERVAL_MINUTES", "BACKUP_DIR", "SCORE_MODEL"):
         monkeypatch.delenv(name, raising=False)
     storage.init_db()
     return tmp_path / "news.db"
