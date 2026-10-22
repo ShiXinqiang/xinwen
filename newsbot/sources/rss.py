@@ -22,7 +22,6 @@ RSS_FEEDS = [
     "https://morvesti.ru/rss/",
     "https://portnews.ru/rss/",
     "https://seanews.ru/feed/",
-    "https://primpress.ru/rss/",
     "https://www.cnews.ru/news/rss",
     "https://www.comnews.ru/rss",
     "http://www.cbr.ru/rss/RssNews",
