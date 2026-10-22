@@ -52,7 +52,7 @@ def test_migration_adds_gas_exclusions_once():
     storage.set_excluded_keywords(['нефть'])  # пользователь сам убрал — повторно не добавляем
     storage.init_db()
     assert storage.get_excluded_keywords() == ['нефть']
-    assert storage.get_config('config_version') == '3'
+    assert storage.get_config('config_version') == '4'
 
 
 def test_migration_keeps_user_list_without_gas(db):
@@ -77,3 +77,16 @@ def test_migration_v3_adds_knr_once(db):
 
 def test_fresh_db_has_knr_without_duplicates():
     assert storage.get_keywords().count('КНР') == 1
+
+
+def test_migration_v4_switches_moderation_to_feed(db):
+    for before, after in (('moderation', 'feed'), ('auto', 'auto')):
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE config SET value = '3' WHERE key = 'config_version'")
+            conn.execute("UPDATE config SET value = ? WHERE key = 'publish_mode'", (before,))
+        storage.init_db()
+        assert storage.get_publish_mode() == after   # ручной выбор режима не трогаем
+
+
+def test_fresh_db_is_feed_mode():
+    assert storage.get_publish_mode() == 'feed'

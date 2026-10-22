@@ -1,6 +1,8 @@
 """
-Один проход сбора: ленты -> свежесть -> ключевые слова -> новизна -> оценка моделью -> модерация владелицей.
-Без ADMIN_CHAT_ID модерации нет — новости публикуются в канал сразу, как раньше.
+Один проход сбора: ленты -> свежесть -> ключевые слова -> новизна -> оценка моделью -> владелице.
+Режим feed (по умолчанию): новости приходят в TELEGRAM_CHAT_ID с 👍/👎, отметки учат отбор.
+Режимы moderation/auto: карточки в ADMIN_CHAT_ID с ✅/❌, одобренное — в канал TELEGRAM_CHAT_ID;
+без ADMIN_CHAT_ID в этих режимах всё, что прошло фильтры, публикуется сразу.
 """
 import asyncio
 import logging
@@ -14,7 +16,8 @@ from newsbot.pipeline.dedup import select_new
 from newsbot.pipeline.filters import ArticleFilter
 from newsbot.pipeline.scoring import score_articles
 from newsbot.pipeline.semantic import semantic_filter
-from newsbot.publisher import format_article, format_card, moderation_keyboard, notify_admin, send_with_retry
+from newsbot.publisher import (feedback_keyboard, format_article, format_card, moderation_keyboard,
+                               notify_admin, send_with_retry)
 from newsbot.sources.rss import fetch_rss_feeds
 from newsbot.yandex import get_embedding
 
@@ -48,11 +51,16 @@ async def _publish_direct(batch, settings, bot, send_delay) -> dict:
     return result
 
 
-async def _moderate(batch, settings, bot, send_delay) -> dict:
-    """Оценка моделью → архив (низкая оценка) / сразу в канал (режим auto, высокая) / карточка владелице."""
+async def _moderate(batch, settings, bot, send_delay, mode: str) -> dict:
+    """
+    Оценка моделью → архив (низкая оценка) / карточка владелице.
+    feed: карточка с 👍/👎 в TELEGRAM_CHAT_ID и есть доставка; moderation/auto: ✅/❌ в ADMIN_CHAT_ID
+    (auto: высокая оценка — сразу в канал).
+    """
     result = {'sent': 0, 'queued': 0, 'archived': 0, 'errors': 0}
     result['scoring'] = await asyncio.to_thread(score_articles, batch, settings.score_model)
-    mode = storage.get_publish_mode()
+    feed = mode == 'feed'
+    target = settings.telegram_chat_id if feed else settings.admin_chat_id
     min_score = storage.get_int_config('min_score_for_moderation')
     auto_score = storage.get_int_config('auto_publish_score')
 
@@ -65,7 +73,7 @@ async def _moderate(batch, settings, bot, send_delay) -> dict:
             storage.add_candidate(a, 'auto_rejected', assessment)
             result['archived'] += 1
             continue
-        if mode == 'auto' and score is not None and score >= auto_score:
+        if not feed and mode == 'auto' and score is not None and score >= auto_score:
             try:
                 await _publish(bot, settings, a)
                 storage.add_candidate(a, 'auto_published', assessment)
@@ -77,13 +85,19 @@ async def _moderate(batch, settings, bot, send_delay) -> dict:
             continue
         candidate_id = storage.add_candidate(a, 'pending', assessment)
         try:
+            keyboard = feedback_keyboard(candidate_id) if feed else moderation_keyboard(candidate_id)
             message = await send_with_retry(
-                bot, chat_id=settings.admin_chat_id, text=format_card(a, assessment),
-                reply_markup=moderation_keyboard(candidate_id), disable_web_page_preview=True,
+                bot, chat_id=target, text=format_card(a, assessment),
+                reply_markup=keyboard, disable_web_page_preview=True,
             )
             if message is not None:
                 storage.set_candidate_message(candidate_id, message.message_id)
-            result['queued'] += 1
+            if feed:
+                # В режиме ленты карточка и есть доставка новости
+                storage.mark_article_sent(a['url'], a['title'], a['source'].get('name', ''), a['_hash'])
+                result['sent'] += 1
+            else:
+                result['queued'] += 1
         except Exception as e:
             # Не показали — убираем, чтобы новость пришла в следующий сбор
             storage.delete_candidate(candidate_id)
@@ -135,8 +149,9 @@ async def run(settings: Settings | None = None, bot=None, fetch=fetch_rss_feeds,
         print(f"Семантика: принято {semantic_stats['passed']}, отклонено {semantic_stats['failed']}")
 
     batch = new_articles[:max_articles_to_send]
-    if settings.admin_chat_id:
-        result = await _moderate(batch, settings, bot, send_delay)
+    mode = storage.get_publish_mode()
+    if mode == 'feed' or settings.admin_chat_id:
+        result = await _moderate(batch, settings, bot, send_delay, mode)
     else:
         result = await _publish_direct(batch, settings, bot, send_delay)
     sent_count, errors = result['sent'], result['errors']
@@ -152,7 +167,7 @@ async def run(settings: Settings | None = None, bot=None, fetch=fetch_rss_feeds,
     )
     scoring = result.get('scoring') or {}
     summary = (f"Сбор новостей: найдено {total_found}, по ключевым словам {len(filtered)}, "
-               f"новых {len(new_articles)}, в канал {sent_count}, на модерацию {result['queued']}, "
+               f"новых {len(new_articles)}, отправлено {sent_count}, на модерацию {result['queued']}, "
                f"в архив {result['archived']}")
     if scoring:
         summary += f", оценено {scoring['scored']} ({scoring['tokens']} токенов)"
