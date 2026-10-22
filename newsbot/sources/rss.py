@@ -6,44 +6,41 @@ import requests
 
 from newsbot.pipeline.normalize import canonical_url, clean_html, entry_published
 
+# Проверено с сервера 22.10.2026: каждая лента отвечает 200 и отдаёт записи.
 RSS_FEEDS = [
     "https://ria.ru/export/rss2/index.xml",
     "https://tass.ru/rss/v2.xml",
     "https://www.interfax.ru/rss.asp",
-    "https://www.finmarket.ru/export/rss.asp",
     "https://www.kommersant.ru/RSS/news.xml",
-    "https://www.vedomosti.ru/rss",
-    "https://1prime.ru/export/rss.xml",
-    "https://www.forbes.ru/rss/all",
-    "https://iz.ru/xml/rss/all.xml",
+    "https://www.vedomosti.ru/rss/news",
+    "https://1prime.ru/export/rss2/index.xml",
+    "https://www.forbes.ru/newrss.xml",
+    "http://www.finmarket.ru/rss/mainnews.asp",
     "https://www.tks.ru/law.rss",
     "https://www.tks.ru/nearby.rss",
-    "https://trans.ru/rss/news",
     "https://www.infranews.ru/feed/",
     "https://www.tourdom.ru/rss/",
-    "https://www.autostat.ru/export/rss/",
-    "https://morvesti.ru/rss/",
-    "https://portnews.ru/rss/",
     "https://seanews.ru/feed/",
-    "https://www.cnews.ru/news/rss",
+    "https://www.cnews.ru/inc/rss/news.xml",
     "https://www.comnews.ru/rss",
     "http://www.cbr.ru/rss/RssNews",
     "http://www.cbr.ru/rss/RssPress",
-    "https://biang.ru/rss/",
-    "http://russian.news.cn/rss/news.xml",
-    "https://www.eastrussia.ru/feed/",
+    "https://www.eastrussia.ru/rss/",
     "https://bigasia.ru/feed/",
-    "http://russian.china.org.cn/rss/feed.xml",
-    "http://russian.people.com.cn/rss/feed.xml",
-    "https://rsshub.app/cnbc/rss/",
-    "https://www.scmp.com/rss/",
-    "https://tvbrics.com/feed/"
+    # «Известия» отвечают 403 на IP сервера (Нидерланды) — берём их статьи через Google Новости
+    "https://news.google.com/rss/search?q=site:iz.ru&hl=ru&gl=RU&ceid=RU:ru",
 ]
 MAX_ARTICLES_PER_FEED = 20
 # Сколько ждать одну ленту: зависший сервер не должен останавливать весь сбор
 FEED_TIMEOUT_SECONDS = 20
 PARALLEL_FEEDS = 8
 USER_AGENT = 'Mozilla/5.0 (compatible; newsbot/1.0; +https://github.com/arthurborodin95-ctrl/xinwen)'
+
+
+def _aggregated_source(entry) -> str | None:
+    """Издание у записи агрегатора (Google Новости кладут его в <source>), иначе None."""
+    source = entry.get('source') or {}
+    return source.get('title') or None
 
 
 def _load_feed(feed_url: str):
@@ -88,14 +85,25 @@ def fetch_rss_feeds(feeds=RSS_FEEDS, max_per_feed=MAX_ARTICLES_PER_FEED):
                 if published is None:
                     continue
                 seen_urls.add(url)
+                title = clean_html(entry.title)
+                description = clean_html(entry.get('summary', '') or entry.get('description', ''))
+                name = source_name
+                outlet = _aggregated_source(entry)
+                if outlet:
+                    # «Заголовок - Известия»: отрезаем издание, чтобы заголовок совпадал с прямой лентой
+                    # (дедупликация по заголовку), а описание агрегатора — это тот же заголовок со ссылкой
+                    suffix = f" - {outlet}"
+                    if title.endswith(suffix):
+                        title = title[:-len(suffix)].rstrip()
+                    name, description = outlet, ''
                 all_articles.append({
-                    'title': clean_html(entry.title),
+                    'title': title,
                     'url': url,
                     'raw_url': entry.link.strip(),
-                    'description': clean_html(entry.get('summary', '') or entry.get('description', '')),
+                    'description': description,
                     'publishedAt': published.isoformat(),
                     'published': published,
-                    'source': {'name': source_name},
+                    'source': {'name': name},
                 })
         except Exception as e:
             print(f"❌ Ошибка парсинга RSS {feed_url}: {e}")

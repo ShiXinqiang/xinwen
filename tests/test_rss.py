@@ -54,3 +54,23 @@ def test_http_feed_uses_timeout_and_survives_errors(monkeypatch):
     articles = rss.fetch_rss_feeds(['https://dead.example/rss', 'https://ok.example/rss'])
     assert [a['title'] for a in articles] == ['Из сети']
     assert all(t == rss.FEED_TIMEOUT_SECONDS for _, t in calls) and len(calls) == 2
+
+
+def test_google_news_entries_take_outlet_name(tmp_path):
+    now = datetime.now(timezone.utc)
+    feed = tmp_path / 'gn.xml'
+    feed.write_text(f"""<?xml version="1.0"?><rss version="2.0"><channel><title>"site:iz.ru" - Google Новости</title>
+<item><title>Китай и ЕАЭС договорились - Известия</title><link>https://news.google.com/rss/articles/CBMiAbc?oc=5</link>
+<description>&lt;a href="https://news.google.com/rss/articles/CBMiAbc?oc=5"&gt;Китай и ЕАЭС договорились&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Известия&lt;/font&gt;</description>
+<pubDate>{rfc(now)}</pubDate><source url="https://iz.ru">Известия</source></item>
+</channel></rss>""", encoding='utf-8')
+    [a] = fetch_rss_feeds([str(feed)])
+    assert a['title'] == 'Китай и ЕАЭС договорились'   # совпадёт с заголовком из прямой ленты iz.ru
+    assert a['source'] == {'name': 'Известия'}
+    assert a['description'] == ''
+    assert a['url'] == 'https://news.google.com/rss/articles/CBMiAbc?oc=5'
+
+
+def test_feed_list_has_no_duplicates():
+    from newsbot.sources.rss import RSS_FEEDS
+    assert len(RSS_FEEDS) == len(set(RSS_FEEDS)) == 20
