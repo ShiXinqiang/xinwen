@@ -20,6 +20,12 @@ DIRECT = Settings(
 MODERATED = replace(DIRECT, admin_chat_id='42')
 
 
+@pytest.fixture(autouse=True)
+def moderation_mode():
+    """Тесты этого файла — про прямую публикацию и модерацию; режим ленты (по умолчанию) — в test_feed."""
+    storage.set_config('publish_mode', 'moderation')
+
+
 def articles():
     return [
         make_article('Китай и ЕАЭС договорились', url='https://ex.ru/1', description='Подробности соглашения', hours_ago=1),
@@ -176,5 +182,5 @@ def test_examples_from_decisions_reach_the_prompt(monkeypatch):
     storage.decide_candidate(rejected, 'rejected')
     run(FakeBot(), MODERATED)
     system = calls[0][0]['text']
-    assert 'одобряла такие новости:\n- Одобренная новость о таможне' in system
-    assert 'отклоняла такие:\n- Отклонённая новость о футболе' in system
+    assert 'понравились такие новости:\n- Одобренная новость о таможне' in system
+    assert 'не понравились такие:\n- Отклонённая новость о футболе' in system

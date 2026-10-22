@@ -54,6 +54,12 @@ def moderation_keyboard(candidate_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton("❌ Отклонить", callback_data=f"mod:reject:{candidate_id}"),
     ]])
 
+def feedback_keyboard(candidate_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("👍 Нравится", callback_data=f"fb:like:{candidate_id}"),
+        InlineKeyboardButton("👎 Не нравится", callback_data=f"fb:dislike:{candidate_id}"),
+    ]])
+
 def article_from_candidate(c: dict) -> dict:
     return {
         'title': c['title'], 'url': c['url'], 'raw_url': c['raw_url'], 'description': c['description'] or '',

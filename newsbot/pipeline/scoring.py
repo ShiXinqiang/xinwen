@@ -12,22 +12,22 @@ logger = logging.getLogger(__name__)
 
 MAX_TEXT_LEN = 1000
 
-SYSTEM_PROMPT = """Ты — редактор Telegram-канала. Оцени, подходит ли новость каналу.
+SYSTEM_PROMPT = """Ты отбираешь новости для владелицы Telegram-бота. Оцени, нужна ли ей эта новость.
 
 Редакционная политика:
 {policy}
 {examples}
 Ответь строго одним JSON-объектом, без пояснений и без markdown:
 {{"score": целое от 0 до 10, "topic": "тема в 2–4 словах", "summary": "суть новости одной фразой до 20 слов", "reason": "почему такая оценка, до 15 слов"}}
-10 — точно для канала, 0 — точно не для канала. Оценивай по сути новости, а не по отдельным словам."""
+10 — точно нужна, 0 — точно не нужна. Оценивай по сути новости, а не по отдельным словам."""
 
 
 def build_system_prompt(policy: str, approved: list[str], rejected: list[str]) -> str:
     examples = ''
     if approved:
-        examples += '\nВладелица канала одобряла такие новости:\n' + '\n'.join(f'- {t}' for t in approved) + '\n'
+        examples += '\nВладелице понравились такие новости:\n' + '\n'.join(f'- {t}' for t in approved) + '\n'
     if rejected:
-        examples += '\nИ отклоняла такие:\n' + '\n'.join(f'- {t}' for t in rejected) + '\n'
+        examples += '\nИ не понравились такие:\n' + '\n'.join(f'- {t}' for t in rejected) + '\n'
     return SYSTEM_PROMPT.format(policy=policy, examples=examples)
 
 def article_prompt(article: dict) -> str:

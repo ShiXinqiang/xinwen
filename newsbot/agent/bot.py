@@ -73,7 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/search <запрос> — поиск новостей\n"
         "/ask <вопрос> — задать вопрос\n"
         "/stats — статистика\n"
-        "/queue — сколько новостей ждут модерации\n"
+        "/queue — сколько новостей ждут вашей оценки\n"
         "/help — помощь\n"
         "Под ответами есть кнопки 👍/👎 для оценки."
     )
@@ -113,8 +113,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @restricted
 async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending = storage.count_pending_candidates()
-    mode = 'модерация' if storage.get_publish_mode() == 'moderation' else 'автопубликация'
-    await update.message.reply_text(f"🗂 Ждут решения: {pending}\nРежим: {mode}")
+    mode = storage.get_publish_mode()
+    if mode == 'feed':
+        await update.message.reply_text(f"🗂 Новостей без вашей оценки 👍/👎: {pending}")
+    else:
+        label = 'модерация' if mode == 'moderation' else 'автопубликация'
+        await update.message.reply_text(f"🗂 Ждут решения: {pending}\nРежим: {label}")
 
 @restricted
 async def feedback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -142,7 +146,7 @@ def build_application(settings=None) -> Application:
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("queue", queue))
-    app.add_handler(CallbackQueryHandler(moderation_callback, pattern='^mod:'))
+    app.add_handler(CallbackQueryHandler(moderation_callback, pattern='^(mod|fb):'))
     app.add_handler(CallbackQueryHandler(feedback_callback, pattern='^feedback_'))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     return app

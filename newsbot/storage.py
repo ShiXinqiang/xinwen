@@ -11,8 +11,10 @@ DEFAULT_CONFIG = {
     'semantic_threshold': '0.55',
     'max_articles_to_send': '30',
     'max_hours_old': '24',
-    # moderation — всё через владелицу; auto — оценка >= auto_publish_score публикуется сама
-    'publish_mode': 'moderation',
+    # feed — новости приходят владелице с 👍/👎, отметки учат отбор (в канал ничего не публикуется);
+    # moderation — карточки владелице с ✅/❌, одобренное уходит в канал;
+    # auto — как moderation, но оценка >= auto_publish_score публикуется сама
+    'publish_mode': 'feed',
     # Ниже этой оценки новость в архив, владелицу не беспокоим
     'min_score_for_moderation': '4',
     'auto_publish_score': '8',
@@ -178,7 +180,11 @@ def _migrate_config(cursor):
             _append_missing(cursor, 'excluded_keywords', _EXCLUDED_ADDED_V2)
     if version < 3:
         _append_missing(cursor, 'keywords', _KEYWORDS_ADDED_V3)
-        cursor.execute("REPLACE INTO config (key, value) VALUES ('config_version', '3')")
+    if version < 4:
+        # Бот присылает новости владелице с 👍/👎 вместо публикации в канал; ручной выбор режима не трогаем
+        cursor.execute("UPDATE config SET value = 'feed' WHERE key = 'publish_mode' AND value = 'moderation'")
+    if version < 4:
+        cursor.execute("REPLACE INTO config (key, value) VALUES ('config_version', '4')")
 
 
 # ============================================================

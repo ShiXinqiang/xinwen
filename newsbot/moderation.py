@@ -1,4 +1,8 @@
-"""Кнопки модерации под карточками новостей: ✅ опубликовать в канал / ❌ отклонить."""
+"""
+Кнопки под карточками новостей:
+- 👍/👎 (режим feed) — оценка владелицы, ничего не публикует; отметки — примеры для модели;
+- ✅/❌ (режим moderation) — опубликовать в канал / отклонить.
+"""
 import logging
 
 from telegram import Update
@@ -11,8 +15,13 @@ from newsbot.publisher import article_from_candidate, format_article, send_with_
 logger = logging.getLogger(__name__)
 
 
+FEEDBACK_LABELS = {'approved': "👍 Учту: такие новости нужны", 'rejected': "👎 Учту: такие больше не присылать"}
+
+
 def _is_moderator(user_id: int, settings, allowed: frozenset) -> bool:
-    return str(user_id) == str(settings.admin_chat_id) or user_id in allowed
+    # TELEGRAM_CHAT_ID с положительным id — личка владелицы: её id совпадает с id чата
+    return (str(user_id) in (str(settings.admin_chat_id), str(settings.telegram_chat_id))
+            or user_id in allowed)
 
 
 async def moderation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -23,7 +32,7 @@ async def moderation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     try:
-        _, action, raw_id = query.data.split(':')
+        kind, action, raw_id = query.data.split(':')
         candidate_id = int(raw_id)
     except ValueError:
         await query.answer("Неизвестная кнопка")
@@ -34,14 +43,16 @@ async def moderation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer("Новость не найдена")
         return
 
-    new_status = 'approved' if action == 'approve' else 'rejected'
+    new_status = 'approved' if action in ('approve', 'like') else 'rejected'
     # Атомарно pending → решение: двойное нажатие не опубликует новость дважды
     if not storage.decide_candidate(candidate_id, new_status):
         await query.answer("Уже решено раньше")
         await query.edit_message_reply_markup(reply_markup=None)
         return
 
-    if new_status == 'approved':
+    if kind == 'fb':
+        label = FEEDBACK_LABELS[new_status]
+    elif new_status == 'approved':
         article = article_from_candidate(candidate)
         try:
             await send_with_retry(context.bot, chat_id=settings.telegram_chat_id,
