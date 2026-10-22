@@ -14,7 +14,8 @@ def db(tmp_path, monkeypatch):
     """Каждый тест — со своей пустой базой; переменные окружения не протекают из .env."""
     monkeypatch.setenv("NEWS_DB_PATH", str(tmp_path / "news.db"))
     for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "ADMIN_CHAT_ID", "ALLOWED_USER_IDS",
-                 "YANDEX_FOLDER_ID", "YANDEX_API_KEY", "GNEWS_API_KEY"):
+                 "YANDEX_FOLDER_ID", "YANDEX_API_KEY", "GNEWS_API_KEY",
+                 "COLLECT_INTERVAL_MINUTES", "BACKUP_DIR"):
         monkeypatch.delenv(name, raising=False)
     storage.init_db()
     return tmp_path / "news.db"

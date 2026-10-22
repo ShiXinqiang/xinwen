@@ -31,7 +31,8 @@ async def run(settings: Settings | None = None, bot=None, fetch=fetch_rss_feeds,
     max_articles_to_send = storage.get_max_articles_to_send()
     max_hours_old = storage.get_max_hours_old()
 
-    all_news = fetch()
+    # Загрузка лент — сетевая и долгая: в отдельном потоке, чтобы агент в том же процессе отвечал
+    all_news = await asyncio.to_thread(fetch)
     total_found = len(all_news)
     print(f"Найдено статей с датой публикации: {total_found}")
 

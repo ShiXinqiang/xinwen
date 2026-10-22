@@ -21,6 +21,8 @@ class Settings:
     yandex_folder_id: str | None
     yandex_api_key: str | None
     gnews_api_key: str | None
+    # Как часто собирать новости в постоянно работающем процессе (VPS)
+    collect_interval_minutes: int = 30
 
 
 def load_settings() -> Settings:
@@ -32,8 +34,13 @@ def load_settings() -> Settings:
         yandex_folder_id=os.getenv("YANDEX_FOLDER_ID") or None,
         yandex_api_key=os.getenv("YANDEX_API_KEY") or None,
         gnews_api_key=os.getenv("GNEWS_API_KEY") or None,
+        collect_interval_minutes=int(os.getenv("COLLECT_INTERVAL_MINUTES") or 30),
     )
 
 
 def db_path() -> str:
     return os.getenv("NEWS_DB_PATH", "news.db")
+
+
+def backup_dir() -> str:
+    return os.getenv("BACKUP_DIR") or os.path.join(os.path.dirname(os.path.abspath(db_path())), "backups")

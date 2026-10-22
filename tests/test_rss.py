@@ -28,3 +28,29 @@ def test_fetch_rss_feeds(tmp_path):
 
 def test_broken_feed_does_not_crash(tmp_path):
     assert fetch_rss_feeds([str(tmp_path / 'missing.xml')]) == []
+
+
+def test_http_feed_uses_timeout_and_survives_errors(monkeypatch):
+    import requests
+    from newsbot.sources import rss
+    now = datetime.now(timezone.utc)
+    calls = []
+
+    class Resp:
+        content = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>Сеть</title>
+<item><title>Из сети</title><link>https://net.ru/1</link><pubDate>{rfc(now)}</pubDate></item>
+</channel></rss>""".encode()
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, timeout, headers):
+        calls.append((url, timeout))
+        if 'dead' in url:
+            raise requests.ConnectionError('Remote end closed connection without response')
+        return Resp()
+
+    monkeypatch.setattr(rss.requests, 'get', fake_get)
+    articles = rss.fetch_rss_feeds(['https://dead.example/rss', 'https://ok.example/rss'])
+    assert [a['title'] for a in articles] == ['Из сети']
+    assert all(t == rss.FEED_TIMEOUT_SECONDS for _, t in calls) and len(calls) == 2

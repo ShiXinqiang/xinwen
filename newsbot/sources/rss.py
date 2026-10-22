@@ -1,5 +1,8 @@
 """Сбор новостей из RSS-лент."""
+from concurrent.futures import ThreadPoolExecutor
+
 import feedparser
+import requests
 
 from newsbot.pipeline.normalize import canonical_url, clean_html, entry_published
 
@@ -37,6 +40,19 @@ RSS_FEEDS = [
     "https://tvbrics.com/feed/"
 ]
 MAX_ARTICLES_PER_FEED = 20
+# Сколько ждать одну ленту: зависший сервер не должен останавливать весь сбор
+FEED_TIMEOUT_SECONDS = 20
+PARALLEL_FEEDS = 8
+USER_AGENT = 'Mozilla/5.0 (compatible; newsbot/1.0; +https://github.com/arthurborodin95-ctrl/xinwen)'
+
+
+def _load_feed(feed_url: str):
+    """Загружает ленту с таймаутом (feedparser сам по себе может ждать бесконечно)."""
+    if not feed_url.startswith(('http://', 'https://')):
+        return feedparser.parse(feed_url)  # локальный файл — в тестах
+    resp = requests.get(feed_url, timeout=FEED_TIMEOUT_SECONDS, headers={'User-Agent': USER_AGENT})
+    resp.raise_for_status()
+    return feedparser.parse(resp.content)
 
 
 def fetch_rss_feeds(feeds=RSS_FEEDS, max_per_feed=MAX_ARTICLES_PER_FEED):
@@ -44,11 +60,23 @@ def fetch_rss_feeds(feeds=RSS_FEEDS, max_per_feed=MAX_ARTICLES_PER_FEED):
     Парсит RSS-ленты. Записи без даты публикации пропускаются.
     Возвращает статьи, отсортированные от новых к старым.
     """
+    def load(feed_url):
+        try:
+            return feed_url, _load_feed(feed_url)
+        except Exception as e:
+            print(f"❌ Ошибка загрузки RSS {feed_url}: {e}")
+            return feed_url, None
+
+    with ThreadPoolExecutor(max_workers=PARALLEL_FEEDS) as pool:
+        loaded = list(pool.map(load, feeds))
+
     all_articles = []
     seen_urls = set()
-    for feed_url in feeds:
+    # Порядок лент сохраняется: при одинаковой ссылке побеждает лента, стоящая выше в списке
+    for feed_url, feed in loaded:
+        if feed is None:
+            continue
         try:
-            feed = feedparser.parse(feed_url)
             source_name = feed.feed.get('title', 'Неизвестный источник')
             for entry in feed.entries[:max_per_feed]:
                 if not entry.get('link') or not entry.get('title'):

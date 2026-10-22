@@ -1,0 +1,25 @@
+[Unit]
+Description=Newsbot: агент и сбор новостей
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=newsbot
+Group=newsbot
+WorkingDirectory=/opt/newsbot
+EnvironmentFile=/etc/newsbot/newsbot.env
+Environment=PYTHONUNBUFFERED=1
+Environment=NEWS_DB_PATH=/var/lib/newsbot/news.db
+ExecStart=/opt/newsbot/venv/bin/python -m newsbot
+Restart=always
+RestartSec=10
+# На сервере ~900 МБ памяти; бот занимает около 100 МБ
+MemoryMax=400M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/newsbot
+
+[Install]
+WantedBy=multi-user.target
