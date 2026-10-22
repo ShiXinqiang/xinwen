@@ -1,6 +1,5 @@
 """Интерактивный агент: /search, /ask, /stats и оценка ответов."""
 import asyncio
-import functools
 import html
 import logging
 
@@ -8,7 +7,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 from newsbot import storage
+from newsbot.agent.access import restricted
 from newsbot.config import load_settings
+from newsbot.moderation import moderation_callback
 from newsbot.pipeline.filters import ArticleFilter
 from newsbot.sources.gnews import fetch_gnews
 from newsbot.sources.rss import fetch_rss_feeds
@@ -64,21 +65,6 @@ async def ask_agent(question: str, user_id: int) -> str:
     return response
 
 
-def restricted(handler):
-    """Пускает только пользователей из ALLOWED_USER_IDS (если список задан)."""
-    @functools.wraps(handler)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        allowed = context.bot_data.get('allowed_user_ids')
-        user = update.effective_user
-        if allowed and (user is None or user.id not in allowed):
-            if update.callback_query:
-                await update.callback_query.answer("Доступ ограничен", show_alert=True)
-            elif update.effective_message:
-                await update.effective_message.reply_text(f"⛔ Доступ ограничен. Ваш id: {user.id if user else '?'}")
-            return
-        return await handler(update, context)
-    return wrapper
-
 @restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -87,6 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/search <запрос> — поиск новостей\n"
         "/ask <вопрос> — задать вопрос\n"
         "/stats — статистика\n"
+        "/queue — сколько новостей ждут модерации\n"
         "/help — помощь\n"
         "Под ответами есть кнопки 👍/👎 для оценки."
     )
@@ -124,6 +111,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📊 Всего отправлено новостей: {total}")
 
 @restricted
+async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pending = storage.count_pending_candidates()
+    mode = 'модерация' if storage.get_publish_mode() == 'moderation' else 'автопубликация'
+    await update.message.reply_text(f"🗂 Ждут решения: {pending}\nРежим: {mode}")
+
+@restricted
 async def feedback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -148,6 +141,8 @@ def build_application(settings=None) -> Application:
     app.add_handler(CommandHandler("search", search))
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("queue", queue))
+    app.add_handler(CallbackQueryHandler(moderation_callback, pattern='^mod:'))
     app.add_handler(CallbackQueryHandler(feedback_callback, pattern='^feedback_'))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     return app

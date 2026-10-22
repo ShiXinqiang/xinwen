@@ -11,6 +11,22 @@ DEFAULT_CONFIG = {
     'semantic_threshold': '0.55',
     'max_articles_to_send': '30',
     'max_hours_old': '24',
+    # moderation — всё через владелицу; auto — оценка >= auto_publish_score публикуется сама
+    'publish_mode': 'moderation',
+    # Ниже этой оценки новость в архив, владелицу не беспокоим
+    'min_score_for_moderation': '4',
+    'auto_publish_score': '8',
+    # Дневной лимит токенов на оценку новостей; при превышении карточки идут без оценки
+    'llm_daily_token_limit': '300000',
+    'editorial_policy': (
+        'Канал для специалистов по внешнеэкономической деятельности (ВЭД). '
+        'Важно: торговля и экономические связи России с Китаем, странами БРИКС, ЕАЭС, Азии; '
+        'импорт и экспорт, параллельный импорт, таможня и таможенное регулирование, пошлины, '
+        'санкции и их влияние на бизнес, логистика и транзит (порты, ж/д, морские перевозки), '
+        'расчёты в национальных валютах, бартер, решения ЦБ и правительства, важные для ВЭД. '
+        'Не нужно: нефть, газ, металлы и сырьё; спорт, шоу-бизнес, культура, происшествия, '
+        'погода; политика и дипломатия без экономической сути; реклама и пресс-релизы.'
+    ),
 }
 
 
@@ -105,6 +121,38 @@ def init_db():
         cursor.executemany('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', DEFAULT_CONFIG.items())
         _migrate_config(cursor)
 
+        # ---- Кандидаты на публикацию (модерация владелицей) ----
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS candidates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT UNIQUE NOT NULL,
+                raw_url TEXT,
+                title TEXT NOT NULL,
+                description TEXT,
+                source TEXT,
+                published_at TEXT,
+                hash TEXT,
+                score INTEGER,          -- 0..10, NULL — модель не оценила
+                topic TEXT,
+                summary TEXT,
+                reason TEXT,
+                status TEXT NOT NULL,   -- pending | approved | rejected | auto_rejected | auto_published
+                admin_message_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                decided_at TIMESTAMP
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_candidates_hash ON candidates (hash)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates (status)')
+
+        # ---- Расход токенов LLM по дням ----
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS llm_usage (
+                day TEXT PRIMARY KEY,
+                tokens INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+
 
 # Слова, которые раньше отсеивались исключением «газ» как подстрокой.
 # Фильтр по леммам их не ловит (и не ловит «газету»), поэтому добавляем явно — один раз.
@@ -155,6 +203,31 @@ def is_hash_sent_recently(hash_value: str, hours: int = 48) -> bool:
         row = conn.execute(
             "SELECT 1 FROM sent_articles WHERE hash = ? AND sent_at >= datetime('now', ?) LIMIT 1",
             (hash_value, f'-{hours} hours')
+        ).fetchone()
+    return row is not None
+
+def is_url_seen(*urls: str) -> bool:
+    """Ссылка уже отправлялась в канал или уже показывалась владелице (кандидат в любом статусе)."""
+    urls = [u for u in urls if u]
+    if not urls:
+        return False
+    marks = ",".join("?" * len(urls))
+    with connect() as conn:
+        row = conn.execute(
+            f'SELECT 1 FROM sent_articles WHERE url IN ({marks}) '
+            f'UNION ALL SELECT 1 FROM candidates WHERE url IN ({marks}) OR raw_url IN ({marks}) LIMIT 1',
+            urls * 3
+        ).fetchone()
+    return row is not None
+
+def is_hash_seen_recently(hash_value: str, hours: int = 48) -> bool:
+    """Заголовок отправлялся или предлагался владелице за последние N часов."""
+    window = f'-{hours} hours'
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM sent_articles WHERE hash = ? AND sent_at >= datetime('now', ?) "
+            "UNION ALL SELECT 1 FROM candidates WHERE hash = ? AND created_at >= datetime('now', ?) LIMIT 1",
+            (hash_value, window, hash_value, window)
         ).fetchone()
     return row is not None
 
@@ -308,3 +381,91 @@ def get_max_hours_old():
 
 def set_max_hours_old(value: int):
     set_config('max_hours_old', str(value))
+
+
+# ============================================================
+# КАНДИДАТЫ НА ПУБЛИКАЦИЮ
+# ============================================================
+
+CANDIDATE_FIELDS = ('id', 'url', 'raw_url', 'title', 'description', 'source', 'published_at', 'hash',
+                    'score', 'topic', 'summary', 'reason', 'status', 'admin_message_id', 'created_at', 'decided_at')
+
+def add_candidate(article: dict, status: str, assessment: dict | None = None) -> int:
+    """Сохраняет новость как кандидата; возвращает id."""
+    assessment = assessment or {}
+    with connect() as conn:
+        cur = conn.execute(
+            '''INSERT INTO candidates (url, raw_url, title, description, source, published_at, hash,
+                                         score, topic, summary, reason, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (article['url'], article.get('raw_url'), article['title'], article.get('description', ''),
+             article.get('source', {}).get('name', ''), article.get('publishedAt'), article.get('_hash'),
+             assessment.get('score'), assessment.get('topic'), assessment.get('summary'),
+             assessment.get('reason'), status)
+        )
+        return cur.lastrowid
+
+def get_candidate(candidate_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(f'SELECT {",".join(CANDIDATE_FIELDS)} FROM candidates WHERE id = ?',
+                           (candidate_id,)).fetchone()
+    return dict(zip(CANDIDATE_FIELDS, row)) if row else None
+
+def set_candidate_message(candidate_id: int, message_id: int):
+    with connect() as conn:
+        conn.execute('UPDATE candidates SET admin_message_id = ? WHERE id = ?', (message_id, candidate_id))
+
+def decide_candidate(candidate_id: int, status: str) -> bool:
+    """Переводит кандидата из pending в status. False — решение уже принято раньше."""
+    with connect() as conn:
+        cur = conn.execute(
+            "UPDATE candidates SET status = ?, decided_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+            (status, candidate_id)
+        )
+        return cur.rowcount == 1
+
+def reopen_candidate(candidate_id: int):
+    """Вернуть в очередь (например, если публикация в канал не удалась)."""
+    with connect() as conn:
+        conn.execute("UPDATE candidates SET status = 'pending', decided_at = NULL WHERE id = ?", (candidate_id,))
+
+def delete_candidate(candidate_id: int):
+    """Убрать кандидата, которого не удалось показать владелице, — в следующий сбор он придёт снова."""
+    with connect() as conn:
+        conn.execute('DELETE FROM candidates WHERE id = ?', (candidate_id,))
+
+def get_moderation_examples(limit: int = 8) -> tuple[list[str], list[str]]:
+    """Последние заголовки, которые владелица одобрила и отклонила, — примеры для модели."""
+    with connect() as conn:
+        def titles(status):
+            return [r[0] for r in conn.execute(
+                'SELECT title FROM candidates WHERE status = ? ORDER BY decided_at DESC LIMIT ?', (status, limit))]
+        return titles('approved'), titles('rejected')
+
+def count_pending_candidates() -> int:
+    with connect() as conn:
+        return conn.execute("SELECT COUNT(*) FROM candidates WHERE status = 'pending'").fetchone()[0]
+
+
+# ============================================================
+# РАСХОД ТОКЕНОВ LLM
+# ============================================================
+
+def add_llm_tokens(tokens: int):
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO llm_usage (day, tokens) VALUES (date('now'), ?) "
+            "ON CONFLICT(day) DO UPDATE SET tokens = tokens + excluded.tokens",
+            (tokens,)
+        )
+
+def get_llm_tokens_today() -> int:
+    with connect() as conn:
+        row = conn.execute("SELECT tokens FROM llm_usage WHERE day = date('now')").fetchone()
+    return row[0] if row else 0
+
+def get_publish_mode() -> str:
+    return get_config('publish_mode', DEFAULT_CONFIG['publish_mode'])
+
+def get_int_config(key: str) -> int:
+    return int(get_config(key, DEFAULT_CONFIG[key]))
