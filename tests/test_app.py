@@ -64,3 +64,8 @@ def test_weekly_backup_sent_to_admin(monkeypatch, tmp_path):
 
     asyncio.run(newsbot_app.backup_job(SimpleNamespace(bot=DocBot(), bot_data={'settings': SETTINGS})))
     assert len(sent) == 1 and sent[0][0] == '42' and sent[0][2].startswith(b'SQLite format 3')
+
+
+def test_default_collect_interval_is_two_hours():
+    from newsbot.config import load_settings
+    assert load_settings().collect_interval_minutes == 120

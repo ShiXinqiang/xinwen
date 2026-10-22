@@ -7,7 +7,7 @@
 
 ```bash
 pip install -r requirements.txt
-python -m newsbot        # основной режим: агент + сбор каждые 30 минут + ежедневная копия базы
+python -m newsbot        # основной режим: агент + сбор каждые 2 часа + ежедневная копия базы
 python main.py           # один проход сбора (для отладки)
 python adjust_filters.py # отчёт по оценкам
 ```
@@ -25,7 +25,7 @@ python adjust_filters.py # отчёт по оценкам
 | `YANDEX_FOLDER_ID`, `YANDEX_API_KEY` | YandexGPT для агента |
 | `GNEWS_API_KEY` | необязательно: GNews для `/search` |
 | `NEWS_DB_PATH` | путь к базе, по умолчанию `news.db` (на сервере `/var/lib/newsbot/news.db`) |
-| `COLLECT_INTERVAL_MINUTES` | как часто собирать новости, по умолчанию 30 |
+| `COLLECT_INTERVAL_MINUTES` | как часто собирать новости, в минутах; по умолчанию 120 (раз в 2 часа) |
 | `SCORE_MODEL` | модель для оценки новостей, по умолчанию `yandexgpt-lite/latest` (можно полный URI `gpt://…`) |
 | `BACKUP_DIR` | куда класть копии базы, по умолчанию `backups/` рядом с базой |
 
