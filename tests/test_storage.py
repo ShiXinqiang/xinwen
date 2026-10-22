@@ -52,7 +52,7 @@ def test_migration_adds_gas_exclusions_once():
     storage.set_excluded_keywords(['нефть'])  # пользователь сам убрал — повторно не добавляем
     storage.init_db()
     assert storage.get_excluded_keywords() == ['нефть']
-    assert storage.get_config('config_version') == '2'
+    assert storage.get_config('config_version') == '3'
 
 
 def test_migration_keeps_user_list_without_gas(db):
@@ -61,3 +61,19 @@ def test_migration_keeps_user_list_without_gas(db):
         conn.execute("UPDATE config SET value = ? WHERE key = 'excluded_keywords'", (json.dumps(['уголь']),))
     storage.init_db()
     assert storage.get_excluded_keywords() == ['уголь']
+
+
+def test_migration_v3_adds_knr_once(db):
+    # База в состоянии версии 2, как рабочая news.db до этого изменения
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE config SET value = '2' WHERE key = 'config_version'")
+        conn.execute("UPDATE config SET value = ? WHERE key = 'keywords'", (json.dumps(['Китай', 'ВЭД'], ensure_ascii=False),))
+    storage.init_db()
+    assert storage.get_keywords() == ['Китай', 'ВЭД', 'КНР']
+    storage.set_keywords(['Китай'])  # пользователь сам убрал — повторно не добавляем
+    storage.init_db()
+    assert storage.get_keywords() == ['Китай']
+
+
+def test_fresh_db_has_knr_without_duplicates():
+    assert storage.get_keywords().count('КНР') == 1
