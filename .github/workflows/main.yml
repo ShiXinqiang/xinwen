@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# Не запускаем два сбора одновременно: оба пишут и коммитят news.db
+concurrency:
+  group: news-db
+  cancel-in-progress: false
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -21,46 +26,39 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Cache virtual environment
-        id: cache-venv
-        uses: actions/cache@v3
-        with:
-          path: venv
-          key: ${{ runner.os }}-venv-v2-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-venv-v2-
+          cache: 'pip'
 
       - name: Install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
-        run: |
-          source venv/bin/activate
-          python gnews_bot_cn.py
+        run: python main.py
 
       - name: Commit and push database
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          if [ -f news.db ]; then
-            git add news.db
-            if git diff --staged --quiet; then
-              echo "✅ База данных не изменилась"
-            else
-              git commit -m "Update news database"
-              git push
-            fi
-          else
+          if [ ! -f news.db ]; then
             echo "⚠️ news.db не найден"
+            exit 0
           fi
+          git add news.db
+          if git diff --staged --quiet; then
+            echo "✅ База данных не изменилась"
+            exit 0
+          fi
+          git commit -m "Update news database"
+          # Если за время запуска в ветку что-то запушили, подтягиваем и пробуем снова,
+          # иначе отправленные статьи не сохранятся и уйдут в канал повторно
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

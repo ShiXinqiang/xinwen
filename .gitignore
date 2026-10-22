@@ -14,9 +14,5 @@ venv/
 # Dotenv
 .env
 
-# Sent articles cache
-#sent_articles.txt
-#sent_titles.txt
-
 # Playwright cache
 .cache/
