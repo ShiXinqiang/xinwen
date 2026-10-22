@@ -93,7 +93,7 @@ def init_db():
         ('excluded_keywords', '["нефть","газ","алюминий","сырьё","металл","добыча","уголь"]'),
         ('semantic_threshold', '0.55'),
         ('max_articles_to_send', '30'),
-        ('max_hours_old', '24'),
+        ('max_hours_old', '12'),
     ]
     for key, value in defaults:
         cursor.execute('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', (key, value))
