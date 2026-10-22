@@ -1,16 +1,14 @@
 import asyncio
+import html
 import logging
 import os
-import re
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from dotenv import load_dotenv
 
 from db import init_db, save_feedback, get_total_sent, get_keywords
 from yandex_ai import call_yandex_gpt
-from news_fetcher import fetch_gnews
-from main import get_news_from_rss, normalize_text
+from news_fetcher import fetch_gnews, fetch_rss_feeds, normalize_text
 
 load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -29,13 +27,13 @@ def format_news_summary(articles, max_items=5):
         title = a.get('title', 'Без заголовка')
         url = a.get('url', '#')
         source = a.get('source', {}).get('name', 'Неизвестный источник')
-        lines.append(f"{i}. [{title}]({url}) — {source}")
+        lines.append(f'{i}. <a href="{html.escape(url, quote=True)}">{html.escape(title)}</a> — {html.escape(source)}')
     return "\n".join(lines)
 
-async def search_news(query: str) -> str:
+def search_news(query: str) -> str:
     articles = fetch_gnews(query, max_articles=10)
     if not articles:
-        all_news = get_news_from_rss()
+        all_news = fetch_rss_feeds()
         keywords = query.split()
         articles = [a for a in all_news if any(kw.lower() in normalize_text(a['title'] + ' ' + a['description']) for kw in keywords)]
     return format_news_summary(articles)
@@ -52,7 +50,7 @@ async def ask_agent(question: str, user_id: int) -> str:
 Вопрос: {question}
 Ответ:
 """
-    response = call_yandex_gpt(prompt, max_tokens=600, temperature=0.7)
+    response = await asyncio.to_thread(call_yandex_gpt, prompt, max_tokens=600, temperature=0.7)
     if not response:
         return "Извините, не удалось обработать запрос."
     history.append(f"Пользователь: {question}")
@@ -77,8 +75,8 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Укажите запрос: /search <текст>")
         return
     await update.message.reply_text("🔍 Ищу...")
-    result = await search_news(query)
-    await update.message.reply_text(result, parse_mode='Markdown', disable_web_page_preview=True)
+    result = await asyncio.to_thread(search_news, query)
+    await update.message.reply_text(result, parse_mode='HTML', disable_web_page_preview=True)
 
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = ' '.join(context.args)
@@ -100,9 +98,11 @@ async def feedback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    rating = 1 if 'like' in query.data else -1
+    rating = 1 if query.data == 'feedback_like' else -1
     save_feedback(user_id, query.message.text[:500], rating)
-    await query.edit_message_text(text="✅ Спасибо за оценку!" if rating == 1 else "😕 Спасибо, я постараюсь улучшиться!")
+    # Ответ оставляем, убираем только кнопки, чтобы не оценивали дважды
+    await query.edit_message_reply_markup(reply_markup=None)
+    await query.message.reply_text("✅ Спасибо за оценку!" if rating == 1 else "😕 Спасибо, я постараюсь улучшиться!")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

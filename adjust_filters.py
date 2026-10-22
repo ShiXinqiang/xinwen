@@ -3,26 +3,11 @@
 Скрипт для адаптивной настройки фильтров бота на основе обратной связи пользователей.
 Запускается по cron (например, раз в сутки).
 """
-import os
-import sys
-import json
 import logging
-import re
-from collections import Counter
 from dotenv import load_dotenv
 load_dotenv()
 
-from db import (
-    init_db,
-    get_keywords,
-    set_keywords,
-    get_excluded_keywords,
-    set_excluded_keywords,
-    get_semantic_threshold,
-    set_semantic_threshold,
-    get_recent_feedback_stats,
-    get_feedback_texts
-)
+from db import init_db, get_recent_feedback_stats
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,62 +16,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def adjust_filters():
+    """
+    Пока только отчёт по оценкам: настройки не меняются.
+
+    Прежняя логика была ошибочной: оценки хранятся как +1/-1, а сравнивались с 3.0/4.0
+    (порог понижался всегда), плохие оценки ослабляли фильтр вместо ужесточения,
+    а в ключевые слова попадали любые частые слова из ответов GPT, включая «это», «который».
+    К тому же оцениваются ответы агента, а не новости канала. Новое обучение — этап 3.
+    """
     init_db()
-    logger.info("Начинаем адаптацию фильтров...")
-    
     avg_rating, count = get_recent_feedback_stats(days=7)
-    logger.info(f"Оценок за 7 дней: {count}, средняя: {avg_rating:.2f}")
-    
-    if count < 10:
-        logger.info("Недостаточно отзывов (нужно >= 10). Пропускаем.")
-        return
-
-    # Корректировка порога семантической схожести
-    current = get_semantic_threshold()
-    if avg_rating < 3.0:
-        new = max(0.4, current - 0.05)
-        set_semantic_threshold(new)
-        logger.info(f"Порог понижен до {new:.2f}")
-    elif avg_rating > 4.0:
-        new = min(0.9, current + 0.05)
-        set_semantic_threshold(new)
-        logger.info(f"Порог повышен до {new:.2f}")
-    else:
-        logger.info(f"Порог остался {current:.2f} (средняя оценка в норме)")
-
-    # Анализ слов из отзывов
-    good, bad = get_feedback_texts(days=7)
-    if good or bad:
-        good_words = Counter()
-        for text in good:
-            for word in re.findall(r'\b\w{3,}\b', text.lower()):
-                good_words[word] += 1
-        bad_words = Counter()
-        for text in bad:
-            for word in re.findall(r'\b\w{3,}\b', text.lower()):
-                bad_words[word] += 1
-
-        # Добавляем часто встречающиеся в полезных новостях слова
-        current_keywords = set(get_keywords())
-        new_keywords = set(current_keywords)
-        for word, count in good_words.most_common(5):
-            if count >= 3 and word not in current_keywords:
-                new_keywords.add(word)
-        if new_keywords != current_keywords:
-            set_keywords(list(new_keywords))
-            logger.info(f"Ключевые слова обновлены: {len(new_keywords)} слов")
-
-        # Добавляем в исключения слова из негативных отзывов
-        current_excluded = set(get_excluded_keywords())
-        new_excluded = set(current_excluded)
-        for word, count in bad_words.most_common(3):
-            if count >= 2 and word not in current_excluded:
-                new_excluded.add(word)
-        if new_excluded != current_excluded:
-            set_excluded_keywords(list(new_excluded))
-            logger.info(f"Список исключений обновлён: {len(new_excluded)} слов")
-
-    logger.info("Адаптация завершена.")
+    logger.info(f"Оценок за 7 дней: {count}, средняя (от -1 до 1): {avg_rating:.2f}")
+    logger.info("Автоматическая корректировка фильтров отключена до этапа 3.")
 
 if __name__ == '__main__':
     adjust_filters()

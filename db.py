@@ -93,7 +93,7 @@ def init_db():
         ('excluded_keywords', '["нефть","газ","алюминий","сырьё","металл","добыча","уголь"]'),
         ('semantic_threshold', '0.55'),
         ('max_articles_to_send', '30'),
-        ('max_hours_old', '12'),
+        ('max_hours_old', '24'),
     ]
     for key, value in defaults:
         cursor.execute('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', (key, value))
@@ -107,13 +107,28 @@ def init_db():
 # ФУНКЦИИ ДЛЯ РАБОТЫ С ОТПРАВЛЕННЫМИ СТАТЬЯМИ
 # ============================================================
 
-def is_hash_sent_today(hash_value: str) -> bool:
-    """Проверяет, был ли уже сегодня отправлен хеш."""
+def is_url_sent(*urls: str) -> bool:
+    """Проверяет, отправлялась ли статья с такой ссылкой когда-либо."""
+    urls = [u for u in urls if u]
+    if not urls:
+        return False
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT 1 FROM sent_articles WHERE hash = ? AND date(sent_at) = date("now")',
-        (hash_value,)
+        f'SELECT 1 FROM sent_articles WHERE url IN ({",".join("?" * len(urls))}) LIMIT 1',
+        urls
+    )
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+def is_hash_sent_recently(hash_value: str, hours: int = 48) -> bool:
+    """Проверяет, отправлялся ли такой хеш заголовка за последние N часов (окно скользящее, а не «сегодня»)."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT 1 FROM sent_articles WHERE hash = ? AND sent_at >= datetime(\'now\', ?) LIMIT 1',
+        (hash_value, f'-{hours} hours')
     )
     exists = cursor.fetchone() is not None
     conn.close()
