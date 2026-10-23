@@ -33,11 +33,9 @@ echo "==> Python-окружение"
 "$APP_DIR/venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
 
 echo "==> База в $DATA_DIR"
+# Существующая база не трогается; новая создаётся ботом при первом запуске.
+# Перенос на другой сервер: положить сюда news.db из резервной копии до запуска.
 mkdir -p "$DATA_DIR/backups"
-if [ ! -f "$DATA_DIR/news.db" ] && [ -f "$APP_DIR/news.db" ]; then
-  cp "$APP_DIR/news.db" "$DATA_DIR/news.db"
-  echo "    перенесена база из репозитория (история отправленных статей сохраняется)"
-fi
 chown -R newsbot:newsbot "$DATA_DIR"
 chmod 750 "$DATA_DIR"
 

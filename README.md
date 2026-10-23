@@ -33,7 +33,7 @@ python adjust_filters.py # отчёт по оценкам
 
 Бот работает на VPS (Ubuntu 24.04) одной службой systemd `newsbot`: агент, сбор новостей по расписанию
 и резервные копии базы (каждый день в 03:30 МСК на диск, хранятся 14 последних; по понедельникам — файлом
-в `ADMIN_CHAT_ID`). База лежит на сервере в `/var/lib/newsbot/`, в git она больше не пишется.
+в `ADMIN_CHAT_ID`). База лежит только на сервере, в `/var/lib/newsbot/news.db`; в репозитории её нет.
 
 **Установка** (от root):
 
@@ -45,6 +45,8 @@ journalctl -u newsbot -f           # лог в реальном времени
 ```
 
 Повторный запуск `install.sh` безопасен: настройки и база не перезаписываются.
+Восстановить базу из копии:
+`systemctl stop newsbot && cp /var/lib/newsbot/backups/news-<дата>.db /var/lib/newsbot/news.db && chown newsbot:newsbot /var/lib/newsbot/news.db && systemctl start newsbot`.
 Обновление вручную: `/opt/newsbot/deploy/update.sh`.
 
 **Автодеплой после слияния в `main`** (workflow `Deploy`: тесты → обновление сервера). Один раз:

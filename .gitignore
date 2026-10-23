@@ -16,3 +16,8 @@ venv/
 
 # Playwright cache
 .cache/
+
+# База и её копии живут на сервере (/var/lib/newsbot), в репозиторий не попадают
+*.db
+*.db-journal
+backups/
