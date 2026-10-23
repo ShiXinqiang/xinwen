@@ -1,6 +1,6 @@
 """
 Проверка модели оценки на сервере (базу не трогает):
-    set -a; . /etc/newsbot/newsbot.env; set +a; /opt/newsbot/venv/bin/python -m newsbot.llm_check
+    cd /opt/newsbot && set -a && . /etc/newsbot/newsbot.env && set +a && venv/bin/python -m newsbot.llm_check
 """
 import sys
 
