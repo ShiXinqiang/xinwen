@@ -35,10 +35,22 @@ python adjust_filters.py # отчёт по оценкам
 и резервные копии базы (каждый день в 03:30 МСК на диск, хранятся 14 последних; по понедельникам — файлом
 в `ADMIN_CHAT_ID`). База лежит только на сервере, в `/var/lib/newsbot/news.db`; в репозитории её нет.
 
-**Установка** (от root):
+**Доступ к репозиторию.** Репозиторий закрытый: сервер скачивает код по ключу только на чтение (deploy key).
+Один раз, от root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/arthurborodin95-ctrl/xinwen/main/deploy/install.sh | bash
+ssh-keygen -t ed25519 -N '' -C newsbot-repo -f /root/.ssh/newsbot_repo -q
+printf 'Host github-newsbot\n    HostName github.com\n    User git\n    IdentityFile /root/.ssh/newsbot_repo\n    IdentitiesOnly yes\n' >> /root/.ssh/config
+chmod 600 /root/.ssh/config
+ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts 2>/dev/null
+cat /root/.ssh/newsbot_repo.pub    # → GitHub: Settings → Deploy keys → Add deploy key (без «Allow write access»)
+```
+
+**Установка** (от root, после доступа к репозиторию):
+
+```bash
+git clone git@github-newsbot:arthurborodin95-ctrl/ved-news-bot.git /opt/newsbot
+bash /opt/newsbot/deploy/install.sh
 nano /etc/newsbot/newsbot.env      # токены и id, шаблон — deploy/newsbot.env.example
 systemctl start newsbot
 journalctl -u newsbot -f           # лог в реальном времени

@@ -34,7 +34,7 @@ MAX_ARTICLES_PER_FEED = 20
 # Сколько ждать одну ленту: зависший сервер не должен останавливать весь сбор
 FEED_TIMEOUT_SECONDS = 20
 PARALLEL_FEEDS = 8
-USER_AGENT = 'Mozilla/5.0 (compatible; newsbot/1.0; +https://github.com/arthurborodin95-ctrl/xinwen)'
+USER_AGENT = 'Mozilla/5.0 (compatible; newsbot/1.0)'
 
 
 def _aggregated_source(entry) -> str | None:

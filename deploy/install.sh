@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Первичная установка бота на сервер (Ubuntu 24.04). Запускать от root:
-#   curl -fsSL https://raw.githubusercontent.com/arthurborodin95-ctrl/xinwen/main/deploy/install.sh | bash
+# Первичная установка бота на сервер (Ubuntu 24.04), от root. Репозиторий закрытый:
+# сначала доступ к нему по ключу (README, «Сервер» → «Доступ к репозиторию»), затем
+#   git clone git@github-newsbot:arthurborodin95-ctrl/ved-news-bot.git /opt/newsbot && bash /opt/newsbot/deploy/install.sh
 # Повторный запуск безопасен: настройки и база не перезаписываются.
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/arthurborodin95-ctrl/xinwen.git}"
+REPO_URL="${REPO_URL:-git@github-newsbot:arthurborodin95-ctrl/ved-news-bot.git}"
 BRANCH="${BRANCH:-main}"
 APP_DIR=/opt/newsbot
 DATA_DIR=/var/lib/newsbot
