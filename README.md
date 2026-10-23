@@ -52,12 +52,13 @@ journalctl -u newsbot -f           # лог в реальном времени
 1. На сервере создать ключ, который умеет только обновлять бота:
    ```bash
    mkdir -p /root/.ssh && chmod 700 /root/.ssh
-   ssh-keygen -t ed25519 -N '' -C deploy -f /root/newsbot_deploy
+   ssh-keygen -t ed25519 -N '' -C newsbot-deploy -f /root/newsbot_deploy -q
    echo "command=\"/opt/newsbot/deploy/update.sh\",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding $(cat /root/newsbot_deploy.pub)" >> /root/.ssh/authorized_keys
+   chmod 600 /root/.ssh/authorized_keys
    cat /root/newsbot_deploy            # → секрет VPS_SSH_KEY
    ssh-keyscan -t ed25519 localhost 2>/dev/null | sed "s/^localhost/<IP сервера>/"   # → секрет VPS_KNOWN_HOSTS
-   rm /root/newsbot_deploy             # закрытый ключ на сервере больше не нужен
    ```
+   После добавления секретов в GitHub закрытый ключ на сервере больше не нужен: `rm /root/newsbot_deploy`.
 2. В GitHub: Settings → Secrets and variables → Actions → секреты `VPS_HOST` (IP сервера), `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`.
 
 Пока секретов нет, деплой просто пропускается.
@@ -77,7 +78,7 @@ journalctl -u newsbot -f           # лог в реальном времени
 без оценки; предупреждение в `ADMIN_CHAT_ID` — не чаще раза в 6 часов.
 
 Команда `/queue` — сколько новостей без оценки владелицы. Проверить модель на сервере:
-`set -a; . /etc/newsbot/newsbot.env; set +a; /opt/newsbot/venv/bin/python -m newsbot.llm_check`.
+`cd /opt/newsbot && set -a && . /etc/newsbot/newsbot.env && set +a && venv/bin/python -m newsbot.llm_check`.
 
 ## Ключевые слова и исключения
 
