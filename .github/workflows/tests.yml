@@ -2,8 +2,6 @@ name: Tests
 
 on:
   push:
-    paths-ignore:
-      - 'news.db'
   pull_request:
 
 permissions:
